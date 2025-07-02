@@ -140,11 +140,11 @@ def get_context_from_display_name(module, manager_url, mgr_username, mgr_passwor
 def get_custom_attributes_from_display_name(module, manager_url, mgr_username, mgr_password, validate_certs, value):
     cust_attrbutes = get_custom_attributes(module, manager_url, mgr_username, mgr_password, validate_certs)
     for cust_attr in cust_attrbutes['results']:
-        print(cust_attr['attributes'])
-        for attribute in cust_attr['attributes']:
-            for attr_value in attribute['value']:
-                if attr_value == value:
-                    return attr_value
+        if 'attributes' in cust_attr:
+            for attribute in cust_attr['attributes']:
+                for attr_value in attribute['value']:
+                    if attr_value == value:
+                        return attr_value
     return None
 
 
