@@ -11,22 +11,24 @@ resource "nsxt_policy_group" "group" {
   dynamic "criteria" {
     for_each = flatten([
       for expr in each.value.expression : [
-        # NestedExpression block as one criteria with AND condition
         expr.resource_type == "NestedExpression" ? expr : null,
-        # Single Condition expression
         expr.resource_type == "Condition" ? expr : null,
-        # IPAddressExpression expression
         expr.resource_type == "IPAddressExpression" ? expr : null,
-        # PathExpression expression
-        expr.resource_type == "PathExpression" ? expr : null
+        expr.resource_type == "PathExpression" ? expr : null,
       ]
     ])
+
+    # Filter out nulls because flatten creates a list with nulls too
+    for_each = [for c in criteria.value != null ? [criteria.value] : []][0]
+
     content {
-      # NestedExpression conditions (ANDed)
       dynamic "condition" {
-        for_each = criteria.value.resource_type == "NestedExpression" ? [
+        for_each = (
+          criteria.value.resource_type == "NestedExpression" && criteria.value.expressions != null
+        ) ? [
           for cond in criteria.value.expressions : cond if cond.resource_type == "Condition"
         ] : []
+
         content {
           key         = condition.value.key
           member_type = condition.value.member_type
@@ -35,7 +37,6 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # Single Condition (tag)
       dynamic "condition" {
         for_each = criteria.value.resource_type == "Condition" ? [criteria.value] : []
         content {
@@ -46,7 +47,6 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # IPAddressExpression block
       dynamic "ipaddress_expression" {
         for_each = criteria.value.resource_type == "IPAddressExpression" ? [criteria.value] : []
         content {
@@ -54,7 +54,6 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # PathExpression block (segments)
       dynamic "path_expression" {
         for_each = criteria.value.resource_type == "PathExpression" ? [criteria.value] : []
         content {
