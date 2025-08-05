@@ -1,0 +1,51 @@
+locals {
+  yaml_sec_groups = yamldecode(file("${path.module}/input_test_file.yaml.txt"))["sec_groups"]
+}
+
+resource "nsxt_policy_group" "dynamic_groups" {
+  for_each = { for group in local.yaml_sec_groups : group["display_name"] => group }
+
+  display_name = each.value["display_name"]
+  description  = each.value["id"]
+  domain       = "default"
+
+  # Loop through each expression in the YAML
+  dynamic "criteria" {
+    # For expressions, replicate all possible conditions
+    for_each = [for expr in each.value["expression"] : expr]
+    content {
+      # VM Tag Conditions
+      dynamic "condition" {
+        for_each = lookup(criteria.value, "resource_type", "") == "NestedExpression" ?
+          [for e in criteria.value["expressions"] : e if try(e["resource_type"], "") == "Condition"] : []
+        content {
+          key         = condition.value["key"]
+          member_type = condition.value["member_type"]
+          operator    = condition.value["operator"]
+          value       = condition.value["value"]
+        }
+      }
+      # Segment Membership
+      dynamic "condition" {
+        for_each = lookup(criteria.value, "resource_type", "") == "PathExpression" ?
+          flatten([for p in criteria.value["paths"] : [{ 
+            key="ID", member_type="Segment", operator="EQUALS", value=p 
+          }]]) : []
+        content {
+          key         = condition.value["key"]
+          member_type = condition.value["member_type"]
+          operator    = condition.value["operator"]
+          value       = condition.value["value"]
+        }
+      }
+      # Static IP addresses
+      dynamic "ipaddress_expression" {
+        for_each = lookup(criteria.value, "resource_type", "") == "IPAddressExpression" ?
+          [for ip in criteria.value["ip_addresses"] : ip] : []
+        content {
+          ip_addresses = [ipaddress_expression.value]
+        }
+      }
+    }
+  }
+}
