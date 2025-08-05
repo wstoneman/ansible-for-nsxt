@@ -1,0 +1,959 @@
+Firewall:
+- display_name: VCF01 Infrastructure
+  sequence_number: 0
+  rules:
+  - sequence_number: 0
+    display_name: VCF01 to DNS Servers
+    id: VCF01_to_DNS_Servers
+    description: VCF components to VCF DNS Services
+    source_groups:
+    - /infra/domains/default/groups/VCF01
+    destination_groups:
+    - /infra/domains/default/groups/DNS_SVC
+    profiles:
+    - /infra/context-profiles/DNS
+    services:
+    - /infra/services/DNS
+    - /infra/services/DNS-UDP
+    action: ALLOW
+    logged: true
+    scope:
+    - ANY
+    disabled: 'False'
+  - sequence_number: 10
+    display_name: VCF01 to NTP Servers
+    id: VCF01_to_NTP_Servers
+    description: VCF components to VCF NTP Services
+    source_groups:
+    - /infra/domains/default/groups/VCF01
+    destination_groups:
+    - /infra/domains/default/groups/NTP_SVC
+    services:
+    - /infra/services/NTP
+    action: ALLOW
+    logged: true
+    scope:
+    - ANY
+    disabled: 'False'
+  - sequence_number: 20
+    display_name: VCF01 to DHCP Servers
+    id: VCF01_to_DHCP_Servers
+    description: VCF components to VCF DHCP Services
+    source_groups:
+    - /infra/domains/default/groups/VCF01
+    destination_groups:
+    - /infra/domains/default/groups/DHCP_SVC
+    services:
+    - /infra/services/DHCP_Services
+    action: ALLOW
+    logged: true
+    scope:
+    - ANY
+    disabled: 'False'
+  - sequence_number: 70
+    display_name: VCF01 to Active Directory
+    id: VCF01_to_Active_Directory
+    description: VCF components to Active Directory
+    source_groups:
+    - /infra/domains/default/groups/VCF01
+    destination_groups:
+    - /infra/domains/default/groups/AD_SVC
+    services:
+    - /infra/services/Active_Directory_Services
+    action: ALLOW
+    logged: true
+    scope:
+    - ANY
+    disabled: 'False'
+  - sequence_number: 80
+    display_name: Active Directory to VCF01
+    id: Active_Directory_to_VCF01
+    description: Active Directory to VCF components
+    source_groups:
+    - /infra/domains/default/groups/AD_SVC
+    destination_groups:
+    - /infra/domains/default/groups/VCF01
+    services:
+    - /infra/services/Active_Directory_Services
+    action: ALLOW
+    logged: true
+    scope:
+    - ANY
+    disabled: 'False'
+  - sequence_number: 30
+    display_name: VCF to Backup Servers
+    id: VCF_to_Backup_Servers
+    description: VCF components to Backup Servers
+    source_groups:
+    - /infra/domains/default/groups/VCF01
+    destination_groups:
+    - /infra/domains/default/groups/BACKUP_SERVERS
+    services:
+    - /infra/services/BACKUP_Services
+    action: ALLOW
+    logged: true
+    scope:
+    - ANY
+    disabled: 'False'
+  - sequence_number: 40
+    display_name: Backup Servers to VCF01
+    id: Backup_Servers_to_VCF01
+    description: Backup Servers to VCF components
+    source_groups:
+    - /infra/domains/default/groups/BACKUP_SERVERS
+    destination_groups:
+    - /infra/domains/default/groups/VCF01
+    services:
+    - /infra/services/BACKUP_Services
+    action: ALLOW
+    logged: true
+    scope:
+    - ANY
+    disabled: 'False'
+  - sequence_number: 50
+    display_name: TOOLS to VCF01
+    id: TOOLS_to_VCF01
+    description: TOOL Services to VCF01
+    source_groups:
+    - /infra/domains/default/groups/TOOLS
+    destination_groups:
+    - /infra/domains/default/groups/VCF01
+    services:
+    - /infra/services/TOOL_Services
+    action: ALLOW
+    logged: true
+    scope:
+    - ANY
+    disabled: 'False'
+  - sequence_number: 60
+    display_name: VCF01 to Vmware Depot
+    id: VCF01_to_Vmware_Depot
+    description: Vmware Depot Access
+    source_groups:
+    - /infra/domains/default/groups/VCF01
+    destination_groups:
+    - ANY
+    profiles:
+    - /infra/context-profiles/Broadcom_Depot
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/VCF01
+    disabled: 'False'
+  category: Infrastructure
+  scope:
+  - ANY
+  description: Firewall Section for VCF Infrastructure Services Access
+  id: VCF01_Infrastructure
+- display_name: VCF01 Management
+  sequence_number: 10
+  rules:
+  - sequence_number: 0
+    display_name: BASTION JH to Any
+    id: BASTION_JH_to_Any
+    description: Bastion JH to VCF01 Servers
+    source_groups:
+    - /infra/domains/default/groups/BASTION
+    destination_groups:
+    - /infra/domains/default/groups/VCF01
+    services:
+    - /infra/services/BASTION_Jump_Server
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/VCF01
+    disabled: 'False'
+  - sequence_number: 10
+    display_name: VCF HTTPS_SSH Traffic
+    id: VCF_HTTPS_SSH_Traffic
+    description: VCF HTTPS and SSH Traffic
+    source_groups:
+    - /infra/domains/default/groups/VCF01_MGMT
+    destination_groups:
+    - /infra/domains/default/groups/M01_WLD
+    - /infra/domains/default/groups/W01_WLD
+    services:
+    - /infra/services/HTTPS
+    - /infra/services/SSH
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/VCF01_MGMT
+    - /infra/domains/default/groups/M01_WLD
+    - /infra/domains/default/groups/W01_WLD
+    disabled: 'False'
+  - sequence_number: 20
+    display_name: VCF SDDC MGMT to VCF WLD
+    id: VCF_SDDC_MGMT_to_VCF_WLD
+    description: VCF SDDC Management Traffic
+    source_groups:
+    - /infra/domains/default/groups/SDDC
+    destination_groups:
+    - /infra/domains/default/groups/M01_WLD
+    - /infra/domains/default/groups/W01_WLD
+    services:
+    - /infra/services/SDDC_Services
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/SDDC
+    - /infra/domains/default/groups/M01_WLD
+    - /infra/domains/default/groups/W01_WLD
+    disabled: 'False'
+  - sequence_number: 30
+    display_name: VCF vCenter ELM
+    id: VCF_vCenter_ELM
+    description: VCF vCenter to vCenter Traffic - vCenter Enhanced Linked Mode
+    source_groups:
+    - /infra/domains/default/groups/ELM_VC
+    - /infra/domains/default/groups/SDDC
+    destination_groups:
+    - /infra/domains/default/groups/ELM_VC
+    - /infra/domains/default/groups/SDDC
+    services:
+    - /infra/services/vCenter_ELM
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/ELM_VC
+    - /infra/domains/default/groups/SDDC
+    disabled: 'False'
+  - sequence_number: 40
+    display_name: VCF vCenter RDU
+    id: VCF_vCenter_RDU
+    description: VCF vCenter Reduce Downtime Upgrade
+    source_groups:
+    - /infra/domains/default/groups/VCF01_MGMT
+    destination_groups:
+    - /infra/domains/default/groups/VCF01_MGMT
+    services:
+    - /infra/services/vCenter_RDU
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/VCF01_MGMT
+    disabled: 'False'
+  - sequence_number: 50
+    display_name: VCF01_MGMT to Any
+    id: VCF01_MGMT_to_Any
+    description: VCF Management Internet Access
+    source_groups:
+    - /infra/domains/default/groups/VCF01_MGMT
+    destination_groups:
+    - ANY
+    profiles:
+    - /infra/context-profiles/INTERNET_FQDN
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/VCF01_MGMT
+    disabled: 'False'
+  - sequence_number: 60
+    display_name: Insecure Protocols
+    id: Insecure_Protocols
+    description: Block all Insecure Protocols
+    source_groups:
+    - ANY
+    destination_groups:
+    - ANY
+    services:
+    - /infra/services/RDP
+    - /infra/services/Server_Message_Block_(SMB)
+    - /infra/services/LLMNR
+    - /infra/services/SMB
+    action: DROP
+    logged: true
+    scope:
+    - /infra/domains/default/groups/VCF01
+    disabled: 'False'
+  category: Environment
+  scope:
+  - ANY
+  description: Firewall Section for VCF Management Services Access
+  id: VCF01_Management
+- display_name: Aria Suite
+  sequence_number: 20
+  rules:
+  - sequence_number: 0
+    display_name: ARIA_SUITE to ARIA_SUITE
+    id: ARIA_SUITE_to_ARIA_SUITE
+    description: Aria Suite Internal Traffic Access
+    source_groups:
+    - /infra/domains/default/groups/ARIA_SUITE
+    - /infra/domains/default/groups/ARIA_SUITE_SNAT
+    destination_groups:
+    - /infra/domains/default/groups/ARIA_SUITE
+    services:
+    - ANY
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/ARIA_SUITE
+    disabled: 'False'
+  - sequence_number: 20
+    display_name: ARIA_SUITE to Any
+    id: ARIA_SUITE_to_Any
+    description: Aria Suite Inbound Traffic
+    source_groups:
+    - /infra/domains/default/groups/M01_WLD
+    - /infra/domains/default/groups/W01_WLD
+    destination_groups:
+    - /infra/domains/default/groups/ARIA_SUITE
+    services:
+    - /infra/services/ARIA_Inbound_Services
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/VCF01
+    disabled: 'False'
+  - sequence_number: 10
+    display_name: VCF WLD to ARIA_SUITE
+    id: VCF_WLD_to_ARIA_SUITE
+    description: Aria Suite Outbound Traffic
+    source_groups:
+    - /infra/domains/default/groups/ARIA_SUITE
+    destination_groups:
+    - ANY
+    services:
+    - /infra/services/ARIA_Outbound_Services
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/VCF01
+    disabled: 'False'
+  - sequence_number: 30
+    display_name: ARIA_SUITE DROP
+    id: ARIA_SUITE_DROP
+    description: Aria Suite Default Drop
+    source_groups:
+    - ANY
+    destination_groups:
+    - ANY
+    services:
+    - ANY
+    action: DROP
+    logged: true
+    scope:
+    - /infra/domains/default/groups/ARIA_SUITE
+    disabled: 'False'
+  category: Environment
+  scope:
+  - ANY
+  description: Firewall Section for VCF Aria Suite Services Access
+  id: Aria_Suite
+- display_name: 'M01_WLD SSP '
+  sequence_number: 30
+  rules:
+  - sequence_number: 0
+    display_name: SSP to vCenter
+    id: SSP_to_vCenter
+    description: All SSPs to vCenter Access
+    source_groups:
+    - /infra/domains/default/groups/VCF01_SSP
+    destination_groups:
+    - /infra/domains/default/groups/M01_VC
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/VCF01_SSP
+    - /infra/domains/default/groups/M01_VC
+    disabled: 'False'
+  - sequence_number: 10
+    display_name: SSP to NSX
+    id: SSP_to_NSX
+    description: SSP to NSX Managers Access
+    source_groups:
+    - /infra/domains/default/groups/M01_SSP
+    destination_groups:
+    - /infra/domains/default/groups/M01_NSX
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_SSP
+    disabled: 'False'
+  - sequence_number: 20
+    display_name: SSPI to SSP
+    id: SSPI_to_SSP
+    description: SSPI to SSP Access
+    source_groups:
+    - /infra/domains/default/groups/M01_SSPI
+    destination_groups:
+    - /infra/domains/default/groups/M01_SSP
+    services:
+    - /infra/services/SSPI_Services
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_SSPI
+    - /infra/domains/default/groups/M01_SSP
+    disabled: 'False'
+  - sequence_number: 30
+    display_name: SSP to SSPI Registry
+    id: SSP_to_SSPI_Registry
+    description: SSP to SSPI Registry Access
+    source_groups:
+    - /infra/domains/default/groups/M01_SSP
+    destination_groups:
+    - /infra/domains/default/groups/M01_SSPI
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_SSP
+    - /infra/domains/default/groups/M01_SSPI
+    disabled: 'False'
+  - sequence_number: 40
+    display_name: VCF MGMT to SSP
+    id: VCF_MGMT_to_SSP
+    description: SSP Ingestion Access
+    source_groups:
+    - /infra/domains/default/groups/M01_NSX
+    - /infra/domains/default/groups/M01_HOSTS
+    - /infra/domains/default/groups/M01_EDGES
+    - /infra/domains/default/groups/M01_SVM
+    destination_groups:
+    - /infra/domains/default/groups/M01_SSPM
+    services:
+    - /infra/services/SSPM_Services
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_SSP
+    disabled: 'False'
+  - sequence_number: 50
+    display_name: SSP to NDR and MPS
+    id: SSP_to_NDR_and_MPS
+    description: SPP feeds for NDR and MPS Access
+    source_groups:
+    - /infra/domains/default/groups/M01_SSP
+    destination_groups:
+    - ANY
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_SSP
+    disabled: 'False'
+  - sequence_number: 60
+    display_name: SSP to SIEM
+    id: SSP_to_SIEM
+    description: SSP to SIEMS Access
+    source_groups:
+    - /infra/domains/default/groups/M01_SSP
+    destination_groups:
+    - /infra/domains/default/groups/SIEM_SVC
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_SSP
+    disabled: 'False'
+  - sequence_number: 70
+    display_name: SSP to SSP
+    id: SSP_to_SSP
+    description: SSP Internal Access
+    source_groups:
+    - /infra/domains/default/groups/M01_SSP
+    destination_groups:
+    - /infra/domains/default/groups/M01_SSP
+    services:
+    - ANY
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_SSP
+    disabled: 'False'
+  category: Environment
+  scope:
+  - ANY
+  description: Firewall Section for VCF M01_WLD SSP Services Access
+  id: M01_WLD_SSP_
+- display_name: W01_WLD SSP
+  sequence_number: 40
+  rules:
+  - sequence_number: 0
+    display_name: SSP to NSX
+    id: SSP_to_NSX
+    description: SSP to NSX Managers Access
+    source_groups:
+    - /infra/domains/default/groups/W01_SSP
+    destination_groups:
+    - /infra/domains/default/groups/W01_NSX
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_SSP
+    - /infra/domains/default/groups/W01_NSX
+    disabled: 'False'
+  - sequence_number: 10
+    display_name: SSPI to SSP
+    id: SSPI_to_SSP
+    description: SSPI to SSP Access
+    source_groups:
+    - /infra/domains/default/groups/W01_SSPI
+    destination_groups:
+    - /infra/domains/default/groups/W01_SSP
+    services:
+    - /infra/services/SSPI_Services
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_SSPI
+    - /infra/domains/default/groups/W01_SSP
+    disabled: 'False'
+  - sequence_number: 20
+    display_name: SSP to SSPI Registry
+    id: SSP_to_SSPI_Registry
+    description: SSP to SSPI Registry Access
+    source_groups:
+    - /infra/domains/default/groups/W01_SSP
+    destination_groups:
+    - /infra/domains/default/groups/W01_SSPI
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_SSP
+    - /infra/domains/default/groups/W01_SSPI
+    disabled: 'False'
+  - sequence_number: 30
+    display_name: VCF MGMT to SSP
+    id: VCF_MGMT_to_SSP
+    description: SSP Ingestion Access
+    source_groups:
+    - /infra/domains/default/groups/W01_NSX
+    - /infra/domains/default/groups/W01_HOSTS
+    - /infra/domains/default/groups/W01_EDGES
+    - /infra/domains/default/groups/W01_SVM
+    destination_groups:
+    - /infra/domains/default/groups/W01_SSPM
+    services:
+    - /infra/services/SSPM_Services
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_SSP
+    - /infra/domains/default/groups/W01_NSX
+    disabled: 'False'
+  - sequence_number: 40
+    display_name: SSP to NDR and MPS
+    id: SSP_to_NDR_and_MPS
+    description: SPP feeds for NDR and MPS Access
+    source_groups:
+    - /infra/domains/default/groups/W01_SSP
+    destination_groups:
+    - ANY
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_SSP
+    disabled: 'False'
+  - sequence_number: 50
+    display_name: SSP to SIEM
+    id: SSP_to_SIEM
+    description: SSP to SIEMS Access
+    source_groups:
+    - /infra/domains/default/groups/W01_SSP
+    destination_groups:
+    - /infra/domains/default/groups/SIEM_SVC
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_SSP
+    disabled: 'False'
+  - sequence_number: 60
+    display_name: SSP to SSP
+    id: SSP_to_SSP
+    description: SSP Internal Access
+    source_groups:
+    - /infra/domains/default/groups/W01_SSP
+    destination_groups:
+    - /infra/domains/default/groups/W01_SSP
+    services:
+    - ANY
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_SSP
+    disabled: 'False'
+  category: Environment
+  scope:
+  - ANY
+  description: Firewall Section for VCF W01_WLD SSP Services Access
+  id: W01_WLD_SSP
+- display_name: M01_WLD
+  sequence_number: 50
+  rules:
+  - sequence_number: 10
+    display_name: NSX to vCenter
+    id: NSX_to_vCenter
+    description: NSX to vCenter Access
+    source_groups:
+    - /infra/domains/default/groups/M01_NSX
+    destination_groups:
+    - /infra/domains/default/groups/M01_VC
+    services:
+    - /infra/services/NSX_Outbound_Access
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_VC
+    disabled: 'False'
+  - sequence_number: 30
+    display_name: 'vCenter to ESXi '
+    id: vCenter_to_ESXi_
+    description: vCenter to ESXi Access
+    source_groups:
+    - /infra/domains/default/groups/M01_VC
+    destination_groups:
+    - /infra/domains/default/groups/M01_HOSTS
+    services:
+    - /infra/services/ESXi_Inbound_Access
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_VC
+    disabled: 'False'
+  - sequence_number: 40
+    display_name: ESXi to vCenter
+    id: ESXi_to_vCenter
+    description: vCenter to ESXi Access
+    source_groups:
+    - /infra/domains/default/groups/M01_HOSTS
+    destination_groups:
+    - /infra/domains/default/groups/M01_VC
+    services:
+    - /infra/services/ESXi_Outbound_Access
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_VC
+    disabled: 'False'
+  - sequence_number: 60
+    display_name: Avi to NSX
+    id: Avi_to_NSX
+    description: Avi ALB to NSX Access
+    source_groups:
+    - /infra/domains/default/groups/M01_AVI_CTL
+    destination_groups:
+    - /infra/domains/default/groups/M01_NSX
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_AVI_CTL
+    disabled: 'False'
+  - sequence_number: 70
+    display_name: Avi to vCenter
+    id: Avi_to_vCenter
+    description: Avi ALB to vCenter Access
+    source_groups:
+    - /infra/domains/default/groups/M01_AVI_CTL
+    destination_groups:
+    - /infra/domains/default/groups/M01_VC
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_AVI_CTL
+    - /infra/domains/default/groups/M01_VC
+    disabled: 'False'
+  - sequence_number: 80
+    display_name: Avi SE to Avi CTL
+    id: Avi_SE_to_Avi_CTL
+    description: Avi Service Engines to Avi Controller Cluster
+    source_groups:
+    - /infra/domains/default/groups/M01_AVI_SE
+    destination_groups:
+    - /infra/domains/default/groups/M01_AVI_CTL
+    services:
+    - /infra/services/Avi_SE_CTL_Access
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_AVI_CTL
+    disabled: 'False'
+  - sequence_number: 90
+    display_name: Avi CTL to Avi SE
+    id: Avi_CTL_to_Avi_SE
+    description: Avi Controller Cluster to Avi Service Engine
+    source_groups:
+    - /infra/domains/default/groups/M01_AVI_CTL
+    destination_groups:
+    - /infra/domains/default/groups/M01_AVI_SE
+    services:
+    - /infra/services/Avi_SE_CTL_Access
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_AVI_CTL
+    disabled: 'False'
+  - sequence_number: 100
+    display_name: Avi CTL to Avi CTL
+    id: Avi_CTL_to_Avi_CTL
+    description: Avi Controller Cluster to Avi Controller Cluster
+    source_groups:
+    - /infra/domains/default/groups/M01_AVI_CTL
+    destination_groups:
+    - /infra/domains/default/groups/M01_AVI_CTL
+    services:
+    - /infra/services/Avi_CTL_Access
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_AVI_CTL
+    disabled: 'False'
+  - sequence_number: 110
+    display_name: Avi CTL to Cloud Services
+    id: Avi_CTL_to_Cloud_Services
+    description: Avi Controller Cluster to Cloud Services
+    source_groups:
+    - /infra/domains/default/groups/M01_AVI_CTL
+    destination_groups:
+    - ANY
+    profiles:
+    - /infra/context-profiles/Avi_Pulse_FQDNs
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_AVI_CTL
+    disabled: 'False'
+  - sequence_number: 50
+    display_name: Management Domain Drop
+    id: Management_Domain_Drop
+    description: Management Domain Default Rule
+    source_groups:
+    - ANY
+    destination_groups:
+    - ANY
+    services:
+    - ANY
+    action: DROP
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_WLD
+    disabled: 'False'
+  category: Application
+  scope:
+  - ANY
+  description: Firewall Section for VCF M01_WLD Service Access
+  id: M01_WLD
+- display_name: W01_WLD
+  sequence_number: 60
+  rules:
+  - sequence_number: 0
+    display_name: NSX to NSX
+    id: NSX_to_NSX
+    description: NSX Manager Cluster Access
+    source_groups:
+    - /infra/domains/default/groups/W01_NSX
+    destination_groups:
+    - /infra/domains/default/groups/W01_NSX
+    services:
+    - /infra/services/NSX_Cluster_Access
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/M01_NSX
+    disabled: 'False'
+  - sequence_number: 10
+    display_name: NSX to vCenter
+    id: NSX_to_vCenter
+    description: NSX to vCenter Access
+    source_groups:
+    - /infra/domains/default/groups/W01_NSX
+    destination_groups:
+    - /infra/domains/default/groups/W01_VC
+    services:
+    - /infra/services/NSX_Outbound_Access
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_NSX
+    - /infra/domains/default/groups/W01_VC
+    disabled: 'False'
+  - sequence_number: 20
+    display_name: NSX Resource to NSX Resource
+    id: NSX_Resource_to_NSX_Resource
+    description: NSX Messaging Access
+    source_groups:
+    - /infra/domains/default/groups/W01_NSX
+    - /infra/domains/default/groups/W01_HOSTS
+    - /infra/domains/default/groups/W01_EDGES
+    destination_groups:
+    - /infra/domains/default/groups/W01_NSX
+    - /infra/domains/default/groups/W01_HOSTS
+    - /infra/domains/default/groups/W01_EDGES
+    services:
+    - /infra/services/NSX_Messaging
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_NSX
+    disabled: 'False'
+  - sequence_number: 30
+    display_name: 'vCenter to ESXi '
+    id: vCenter_to_ESXi_
+    description: vCenter to ESXi Access
+    source_groups:
+    - /infra/domains/default/groups/W01_VC
+    destination_groups:
+    - /infra/domains/default/groups/W01_HOSTS
+    services:
+    - /infra/services/ESXi_Inbound_Access
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_VC
+    disabled: 'False'
+  - sequence_number: 40
+    display_name: ESXi to vCenter
+    id: ESXi_to_vCenter
+    description: vCenter to ESXi Access
+    source_groups:
+    - /infra/domains/default/groups/W01_HOSTS
+    destination_groups:
+    - /infra/domains/default/groups/W01_VC
+    services:
+    - /infra/services/ESXi_Outbound_Access
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_VC
+    disabled: 'False'
+  - sequence_number: 60
+    display_name: Avi to NSX
+    id: Avi_to_NSX
+    description: Avi ALB to NSX Access
+    source_groups:
+    - /infra/domains/default/groups/W01_AVI_CTL
+    destination_groups:
+    - /infra/domains/default/groups/W01_NSX
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_AVI_CTL
+    - /infra/domains/default/groups/W01_NSX
+    disabled: 'False'
+  - sequence_number: 70
+    display_name: Avi to vCenter
+    id: Avi_to_vCenter
+    description: Avi ALB to vCenter Access
+    source_groups:
+    - /infra/domains/default/groups/W01_AVI_CTL
+    destination_groups:
+    - /infra/domains/default/groups/W01_VC
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_AVI_CTL
+    - /infra/domains/default/groups/W01_VC
+    disabled: 'False'
+  - sequence_number: 80
+    display_name: Avi SE to Avi CTL
+    id: Avi_SE_to_Avi_CTL
+    description: Avi Service Engines to Avi Controller Cluster
+    source_groups:
+    - /infra/domains/default/groups/W01_AVI_SE
+    destination_groups:
+    - /infra/domains/default/groups/W01_AVI_CTL
+    services:
+    - /infra/services/Avi_SE_CTL_Access
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_AVI_CTL
+    disabled: 'False'
+  - sequence_number: 90
+    display_name: Avi CTL to Avi SE
+    id: Avi_CTL_to_Avi_SE
+    description: Avi Controller Cluster to Avi Service Engine
+    source_groups:
+    - /infra/domains/default/groups/W01_AVI_CTL
+    destination_groups:
+    - /infra/domains/default/groups/W01_AVI_SE
+    services:
+    - /infra/services/Avi_SE_CTL_Access
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_AVI_CTL
+    disabled: 'False'
+  - sequence_number: 100
+    display_name: Avi CTL to Avi CTL
+    id: Avi_CTL_to_Avi_CTL
+    description: Avi Controller Cluster to Avi Controller Cluster
+    source_groups:
+    - /infra/domains/default/groups/W01_AVI_CTL
+    destination_groups:
+    - /infra/domains/default/groups/W01_AVI_CTL
+    services:
+    - /infra/services/Avi_CTL_Access
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_AVI_CTL
+    disabled: 'False'
+  - sequence_number: 110
+    display_name: Avi CTL to Cloud Services
+    id: Avi_CTL_to_Cloud_Services
+    description: Avi Controller Cluster to Cloud Services
+    source_groups:
+    - /infra/domains/default/groups/W01_AVI_CTL
+    destination_groups:
+    - ANY
+    profiles:
+    - /infra/context-profiles/Avi_Pulse_FQDNs
+    services:
+    - /infra/services/HTTPS
+    action: ALLOW
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_AVI_CTL
+    disabled: 'False'
+  - sequence_number: 50
+    display_name: Management Domain Drop
+    id: Management_Domain_Drop
+    description: Management Domain Default Rule
+    source_groups:
+    - ANY
+    destination_groups:
+    - ANY
+    services:
+    - ANY
+    action: DROP
+    logged: true
+    scope:
+    - /infra/domains/default/groups/W01_WLD
+    disabled: 'False'
+  category: Application
+  scope:
+  - ANY
+  description: Firewall Section for VCF W01_WLD Service Access
+  id: W01_WLD
