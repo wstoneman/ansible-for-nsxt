@@ -6,18 +6,17 @@ resource "nsxt_policy_group" "group" {
   for_each     = { for sg in local.sec_groups : sg["display_name"] => sg }
   display_name = each.value["display_name"]
   description  = try(each.value["id"], null)
-  domain       = "default" # Adjust as needed
+  domain       = "default"
 
-  # Loop over each expression per group
+  # For complex groups, loop through expressions
   dynamic "criteria" {
     for_each = [
       for expr in each.value["expression"] :
       {
         type        = try(expr["resource_type"], "")
         expressions = try(expr["expressions"], null)
-        ipaddrs     = try(expr["ip_addresses"], null)
         paths       = try(expr["paths"], null)
-        # direct non-nested/flat
+        ipaddrs     = try(expr["ip_addresses"], null)
         key         = try(expr["key"], null)
         member_type = try(expr["member_type"], null)
         operator    = try(expr["operator"], null)
@@ -28,7 +27,7 @@ resource "nsxt_policy_group" "group" {
       )
     ]
     content {
-      # Tag criteria (NestedExpression or single Condition)
+      # Nested Expression or single Condition (tags)
       dynamic "condition" {
         for_each = criteria.value.type == "NestedExpression" ? [
           for subexpr in criteria.value.expressions :
@@ -41,27 +40,24 @@ resource "nsxt_policy_group" "group" {
           value       = condition.value["value"]
         }
       }
-
-      # Static IP addresses
+      # Static IPs
       dynamic "ipaddress_expression" {
         for_each = criteria.value.type == "IPAddressExpression" && criteria.value.ipaddrs != null ? [
           { ip_addresses = criteria.value.ipaddrs }
         ] : []
         content {
-          ip_addresses = ipaddress_expression.value["ip_addresses"]
+          ip_addresses = ipaddress_expression.value.ip_addresses
         }
       }
-    }
-  }
-
-  # PathExpression is handled outside of criteria as a dedicated block
-  dynamic "path_expression" {
-    for_each = flatten([
-      for expr in each.value["expression"] :
-      expr["resource_type"] == "PathExpression" && expr["paths"] != null ? expr["paths"] : []
-    ])
-    content {
-      paths = [path_expression.value]
+      # DIRECT SEGMENT MEMBERSHIP (PathExpression as path_expression block inside criteria)
+      dynamic "path_expression" {
+        for_each = criteria.value.type == "PathExpression" && criteria.value.paths != null ? [
+          { member_paths = criteria.value.paths }
+        ] : []
+        content {
+          member_paths = path_expression.value.member_paths
+        }
+      }
     }
   }
 }
