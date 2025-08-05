@@ -1,0 +1,54 @@
+variable "sec_groups" {
+  description = "List of security groups"
+  type        = any
+}
+
+locals {
+  sec_groups = var.sec_groups["sec_groups"]
+}
+
+# Loop over Security Groups
+resource "nsxt_policy_group" "this" {
+  for_each    = { for sg in local.sec_groups : sg["id"] => sg }
+
+  display_name = each.value.display_name
+
+  dynamic "criteria" {
+    for_each = [for expr in each.value.expression : expr if expr["resource_type"] == "NestedExpression" || expr["resource_type"] == "PathExpression" || expr["resource_type"] == "IPAddressExpression"]
+
+    content {
+      # Handle NestedExpression; flatten if multiple & ensure OR between
+      dynamic "condition" {
+        for_each = expr["resource_type"] == "NestedExpression" ? expr["expressions"] : []
+        content {
+          # Match Key, Operator, Value as per NSX-T API (adjust as per your need)
+          key           = condition.value["key"]
+          operator      = condition.value["operator"]
+          value         = condition.value["value"]
+          member_type   = condition.value["member_type"]
+          resource_type = condition.value["resource_type"]
+        }
+      }
+
+      # Handle PathExpression
+      dynamic "path_expression" {
+        for_each = expr["resource_type"] == "PathExpression" ? expr["paths"] : []
+        content {
+          path = path_expression.value
+        }
+      }
+
+      # Handle IPAddressExpression
+      dynamic "ip_expression" {
+        for_each = expr["resource_type"] == "IPAddressExpression" ? expr["ip_addresses"] : []
+        content {
+          ip_addresses = [ip_expression.value]
+        }
+      }
+    }
+  }
+
+  # Explicitly handle the OR conjunction for multiple NestedExpressions per your requirements.
+  # NSX-T Policy API does not have an explicit "OR" field, but if multiple criteria are present,
+  # they're evaluated as an OR.
+}
