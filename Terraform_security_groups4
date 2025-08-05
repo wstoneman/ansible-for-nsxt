@@ -3,27 +3,32 @@ locals {
 }
 
 resource "nsxt_policy_group" "group" {
-  for_each     = {for sg in local.sec_groups : sg.display_name => sg}
+  for_each     = { for sg in local.sec_groups : sg.display_name => sg }
   display_name = each.value.display_name
   description  = try(each.value.id, null)
   domain       = "default"
 
   dynamic "criteria" {
-    # Flatten and filter non-null expressions by type
-    for_each = [
-      for expr in each.value.expression : expr
-      if contains(
-        ["NestedExpression", "Condition", "IPAddressExpression", "PathExpression"],
-        try(expr.resource_type, "")
-      )
-    ]
+    # Build a valid list of criteria objects for the group
+    for_each = tolist(flatten([
+      # 1. If there are multiple NestedExpressions (ANDs) separated by OR, use 1 criteria block per NestedExpression (NSX-T interprets multiple criteria as OR).
+      length([for expr in each.value.expression : expr if try(expr.resource_type, "") == "NestedExpression"]) > 1 ?
+        [for expr in each.value.expression : expr if try(expr.resource_type, "") == "NestedExpression"]
+      :
+        # 2. Otherwise, just include all non-null, non-ConjunctionOperator criteria
+        [for expr in each.value.expression :
+          expr if contains([
+            "NestedExpression", "Condition", "IPAddressExpression", "PathExpression"
+          ], try(expr.resource_type, ""))
+        ]
+    ]))
 
     content {
       dynamic "condition" {
-        for_each = criteria.value.resource_type == "NestedExpression" ? [
-          for c in criteria.value.expressions : c if c.resource_type == "Condition"
-        ] : criteria.value.resource_type == "Condition" ? [criteria.value] : []
-
+        for_each = try(criteria.value.resource_type, "") == "NestedExpression" ?
+          [for cond in criteria.value.expressions : cond if try(cond.resource_type, "") == "Condition"]
+          :
+          (try(criteria.value.resource_type, "") == "Condition" ? [criteria.value] : [])
         content {
           key         = condition.value.key
           member_type = condition.value.member_type
@@ -33,16 +38,16 @@ resource "nsxt_policy_group" "group" {
       }
 
       dynamic "ipaddress_expression" {
-        for_each = criteria.value.resource_type == "IPAddressExpression" ? [criteria.value] : []
+        for_each = try(criteria.value.resource_type, "") == "IPAddressExpression" ? [criteria.value] : []
         content {
-          ip_addresses = ipaddress_expression.value.ip_addresses
+          ip_addresses = criteria.value.ip_addresses
         }
       }
 
       dynamic "path_expression" {
-        for_each = criteria.value.resource_type == "PathExpression" ? [criteria.value] : []
+        for_each = try(criteria.value.resource_type, "") == "PathExpression" ? [criteria.value] : []
         content {
-          member_paths = path_expression.value.paths
+          member_paths = criteria.value.paths
         }
       }
     }
