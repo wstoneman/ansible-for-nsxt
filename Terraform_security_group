@@ -1,23 +1,37 @@
 locals {
-  yaml_sec_groups = yamldecode(file("${path.module}/input_test_file.yaml.txt"))["sec_groups"]
+  sec_groups = yamldecode(file("${path.module}/input_test_file.yaml.txt"))["sec_groups"]
 }
 
-resource "nsxt_policy_group" "dynamic_groups" {
-  for_each = { for group in local.yaml_sec_groups : group["display_name"] => group }
+resource "nsxt_policy_group" "group" {
+  for_each     = { for sg in local.sec_groups : sg["display_name"] => sg }
 
   display_name = each.value["display_name"]
-  description  = each.value["id"]
-  domain       = "default"
+  description  = try(each.value["id"], null)
+  domain       = "default" # change as needed
 
-  # Loop through each expression in the YAML
+  # Explicitly process each entry in the 'expression' list
   dynamic "criteria" {
-    # For expressions, replicate all possible conditions
-    for_each = [for expr in each.value["expression"] : expr]
+    for_each = [
+      for expr in each.value["expression"] :
+      {
+        type        = try(expr["resource_type"], "")
+        expressions = try(expr["expressions"], null)
+        paths       = try(expr["paths"], null)
+        ipaddrs     = try(expr["ip_addresses"], null)
+        # direct non-nested/flat
+        key         = try(expr["key"], null)
+        member_type = try(expr["member_type"], null)
+        operator    = try(expr["operator"], null)
+        value       = try(expr["value"], null)
+      } if contains(["NestedExpression", "PathExpression", "IPAddressExpression", "Condition"], try(expr["resource_type"], expr["key"]))
+    ]
     content {
-      # VM Tag Conditions
+      # Tag criteria (NestedExpression)
       dynamic "condition" {
-        for_each = lookup(criteria.value, "resource_type", "") == "NestedExpression" ?
-          [for e in criteria.value["expressions"] : e if try(e["resource_type"], "") == "Condition"] : []
+        for_each = criteria.value.type == "NestedExpression" ? [
+          for subexpr in criteria.value.expressions :
+            subexpr if try(subexpr["resource_type"], "") == "Condition"
+        ] : criteria.value.type == "Condition" ? [criteria.value] : []
         content {
           key         = condition.value["key"]
           member_type = condition.value["member_type"]
@@ -25,12 +39,16 @@ resource "nsxt_policy_group" "dynamic_groups" {
           value       = condition.value["value"]
         }
       }
-      # Segment Membership
+      # Segment membership
       dynamic "condition" {
-        for_each = lookup(criteria.value, "resource_type", "") == "PathExpression" ?
-          flatten([for p in criteria.value["paths"] : [{ 
-            key="ID", member_type="Segment", operator="EQUALS", value=p 
-          }]]) : []
+        for_each = criteria.value.type == "PathExpression" && criteria.value.paths != null ? [
+          for path in criteria.value.paths : {
+            key         = "ID"
+            member_type = "Segment"
+            operator    = "EQUALS"
+            value       = path
+          }
+        ] : []
         content {
           key         = condition.value["key"]
           member_type = condition.value["member_type"]
@@ -38,14 +56,16 @@ resource "nsxt_policy_group" "dynamic_groups" {
           value       = condition.value["value"]
         }
       }
-      # Static IP addresses
+      # IP addresses
       dynamic "ipaddress_expression" {
-        for_each = lookup(criteria.value, "resource_type", "") == "IPAddressExpression" ?
-          [for ip in criteria.value["ip_addresses"] : ip] : []
+        for_each = criteria.value.type == "IPAddressExpression" && criteria.value.ipaddrs != null ? [
+          { ip_addresses = criteria.value.ipaddrs }
+        ] : []
         content {
-          ip_addresses = [ipaddress_expression.value]
+          ip_addresses = ipaddress_expression.value["ip_addresses"]
         }
       }
     }
   }
 }
+
