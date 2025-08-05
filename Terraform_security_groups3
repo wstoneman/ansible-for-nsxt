@@ -2,42 +2,39 @@ locals {
   sec_groups = yamldecode(file("${path.module}/input_test_file.yaml.txt"))["sec_groups"]
 }
 
-resource "nsxt_policy_group" "group" {
-  for_each = { for sg in local.sec_groups : sg.display_name => sg }
+# Helper locals to detect multi-NestedExpression+OR cases
+locals {
+  is_nested_group = {
+    for sg in local.sec_groups : sg.display_name =>
+    (
+      length([
+        for expr in sg.expression : expr if try(expr.resource_type, "") == "NestedExpression"
+      ]) > 1 ||
+      contains([
+        for expr in sg.expression : try(expr.conjunction_operator, "")
+      ], "OR")
+    )
+  }
+  nested_blocks = {
+    for sg in local.sec_groups : sg.display_name =>
+    [for expr in sg.expression : expr if try(expr.resource_type, "") == "NestedExpression"]
+  }
+}
 
+resource "nsxt_policy_group" "group" {
+  for_each     = { for sg in local.sec_groups : sg.display_name => sg }
   display_name = each.value.display_name
   description  = try(each.value.id, null)
   domain       = "default"
 
+  # ----- GROUPED CRITERIA, e.g., VCF01 -----
   dynamic "criteria" {
-    for_each = (
-      length([
-        for expr in each.value.expression :
-          expr if try(expr.resource_type, "") == "NestedExpression"
-      ]) > 1 ||
-      contains([
-        for expr in each.value.expression :
-          try(expr.conjunction_operator, "")
-      ], "OR")
-    )
-    ? [{
-        type  = "NestedExpressionGroup"
-        exprs = [for expr in each.value.expression : expr if try(expr.resource_type, "") == "NestedExpression"]
-      }]
-    : [for expr in each.value.expression : expr]
-
+    for_each = local.is_nested_group[each.key] ? [1] : []
     content {
-      # Emit conjunction block only if the type indicates NestedExpressionGroup (needs 'OR')
-      dynamic "conjunction_block" {
-        for_each = try(criteria.value.type, "") == "NestedExpressionGroup" ? [1] : []
-        content {
-          conjunction = "OR"
-        }
-      }
+      conjunction = "OR"
 
-      # Nested criteria blocks (AND)
       dynamic "criteria" {
-        for_each = try(criteria.value.type, "") == "NestedExpressionGroup" ? criteria.value.exprs : []
+        for_each = local.nested_blocks[each.key]
         content {
           conjunction = "AND"
           dynamic "condition" {
@@ -51,7 +48,13 @@ resource "nsxt_policy_group" "group" {
           }
         }
       }
+    }
+  }
 
+  # ----- SIMPLE CRITERIA -----
+  dynamic "criteria" {
+    for_each = local.is_nested_group[each.key] ? [] : [for expr in each.value.expression : expr]
+    content {
       # Single NestedExpression (AND)
       dynamic "condition" {
         for_each = try(criteria.value.resource_type, "") == "NestedExpression"
@@ -65,7 +68,7 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # Single flat Condition
+      # Single Condition (flat tag)
       dynamic "condition" {
         for_each = try(criteria.value.resource_type, "") == "Condition" ? [criteria.value] : []
         content {
@@ -76,7 +79,7 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # IPAddressExpression
+      # IP addresses
       dynamic "ipaddress_expression" {
         for_each = try(criteria.value.resource_type, "") == "IPAddressExpression" ? [criteria.value] : []
         content {
@@ -84,7 +87,7 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # PathExpression for segments
+      # Segments
       dynamic "path_expression" {
         for_each = try(criteria.value.resource_type, "") == "PathExpression" ? [criteria.value] : []
         content {
