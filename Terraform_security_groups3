@@ -8,33 +8,26 @@ resource "nsxt_policy_group" "group" {
   description  = try(each.value.id, null)
   domain       = "default"
 
-  # Handle tag/IP/segment membership with support for top-level OR
   dynamic "criteria" {
-    # For most groups, 1 element: simple; for groups like VCF01: multiple NestedExpression objects + OR
     for_each = (
       length([
         for expr in each.value.expression :
-          expr if expr.resource_type == "NestedExpression"
+          expr if try(expr.resource_type, "") == "NestedExpression"
       ]) > 1 ||
-      (
-        length([for expr in each.value.expression : expr if expr.resource_type == "NestedExpression"]) > 0 &&
-        contains([for expr in each.value.expression : try(expr.conjunction_operator, "")], "OR")
-      )
-      )
-        # Handle the OR for multiple NestedExpression objects
-        ? [
-            {
-              type        = "NestedExpressionGroup"
-              group_exprs = [for expr in each.value.expression : expr if expr.resource_type == "NestedExpression"]
-            }
-          ]
-        # Otherwise, generate one block per expression
-        : [for expr in each.value.expression : expr]
+      contains([
+        for expr in each.value.expression :
+          try(expr.conjunction_operator, "")
+      ], "OR")
     )
+      ? [{
+          type = "NestedExpressionGroup"
+          exprs = [for expr in each.value.expression : expr if try(expr.resource_type, "") == "NestedExpression"]
+        }]
+      : [for expr in each.value.expression : expr]
     content {
-      # If this is a grouped NestedExpression block (needs OR at parent)
+      # If this is a grouped NestedExpression block (needs top-level 'OR')
       dynamic "criteria" {
-        for_each = criteria.value.type == "NestedExpressionGroup" ? criteria.value.group_exprs : []
+        for_each = try(criteria.value.type, "") == "NestedExpressionGroup" ? criteria.value.exprs : []
         content {
           conjunction = "AND"
           dynamic "condition" {
@@ -48,10 +41,9 @@ resource "nsxt_policy_group" "group" {
           }
         }
       }
-      # Add conjunction = OR if needed
-      conjunction = criteria.value.type == "NestedExpressionGroup" ? "OR" : null
+      conjunction = try(criteria.value.type, "") == "NestedExpressionGroup" ? "OR" : null
 
-      # Regular NestedExpression
+      # Single NestedExpression (default: AND inside single group)
       dynamic "condition" {
         for_each = try(criteria.value.resource_type, "") == "NestedExpression"
           ? [for sub in criteria.value.expressions : sub if try(sub.resource_type, "") == "Condition"]
@@ -64,7 +56,7 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # Flat Condition (single tag)
+      # Single flat tag Condition
       dynamic "condition" {
         for_each = try(criteria.value.resource_type, "") == "Condition" ? [criteria.value] : []
         content {
@@ -75,7 +67,7 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # Static IP membership
+      # Static IPs
       dynamic "ipaddress_expression" {
         for_each = try(criteria.value.resource_type, "") == "IPAddressExpression" ? [criteria.value] : []
         content {
@@ -83,7 +75,7 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # Segment (PathExpression): handled within criteria as path_expression
+      # Segments (PathExpression)
       dynamic "path_expression" {
         for_each = try(criteria.value.resource_type, "") == "PathExpression" ? [criteria.value] : []
         content {
