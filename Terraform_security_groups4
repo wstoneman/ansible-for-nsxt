@@ -1,0 +1,66 @@
+locals {
+  sec_groups = yamldecode(file("${path.module}/input_test_file.yaml.txt"))["sec_groups"]
+}
+
+resource "nsxt_policy_group" "group" {
+  for_each     = { for sg in local.sec_groups : sg.display_name => sg }
+  display_name = each.value.display_name
+  description  = try(each.value.id, null)
+  domain       = "default"
+
+  dynamic "criteria" {
+    for_each = flatten([
+      for expr in each.value.expression : [
+        # NestedExpression block as one criteria with AND condition
+        expr.resource_type == "NestedExpression" ? expr : null,
+        # Single Condition expression
+        expr.resource_type == "Condition" ? expr : null,
+        # IPAddressExpression expression
+        expr.resource_type == "IPAddressExpression" ? expr : null,
+        # PathExpression expression
+        expr.resource_type == "PathExpression" ? expr : null
+      ]
+    ])
+    content {
+      # NestedExpression conditions (ANDed)
+      dynamic "condition" {
+        for_each = criteria.value.resource_type == "NestedExpression" ? [
+          for cond in criteria.value.expressions : cond if cond.resource_type == "Condition"
+        ] : []
+        content {
+          key         = condition.value.key
+          member_type = condition.value.member_type
+          operator    = condition.value.operator
+          value       = condition.value.value
+        }
+      }
+
+      # Single Condition (tag)
+      dynamic "condition" {
+        for_each = criteria.value.resource_type == "Condition" ? [criteria.value] : []
+        content {
+          key         = condition.value.key
+          member_type = condition.value.member_type
+          operator    = condition.value.operator
+          value       = condition.value.value
+        }
+      }
+
+      # IPAddressExpression block
+      dynamic "ipaddress_expression" {
+        for_each = criteria.value.resource_type == "IPAddressExpression" ? [criteria.value] : []
+        content {
+          ip_addresses = criteria.value.ip_addresses
+        }
+      }
+
+      # PathExpression block (segments)
+      dynamic "path_expression" {
+        for_each = criteria.value.resource_type == "PathExpression" ? [criteria.value] : []
+        content {
+          member_paths = criteria.value.paths
+        }
+      }
+    }
+  }
+}
