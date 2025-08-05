@@ -25,23 +25,15 @@ resource "nsxt_policy_group" "group" {
         }]
       : [for expr in each.value.expression : expr]
     content {
-      # Set conjunction only if type == NestedExpressionGroup
-      lifecycle {
-        ignore_changes = [conjunction]
-      }
-
-      # Use "OR" conjunction for grouped NestedExpressions, otherwise omit (default is OR)
-      # Only include the attribute if needed to avoid Terraform syntax errors
-      # Using this workaround as Terraform doesn't allow null attribute directly
-      # Using a conditional block workaround below:
-      dynamic "conjunction_block" {
+      # Conditionally add conjunction block only for NestedExpressionGroup
+      dynamic "conjunction" {
         for_each = try(criteria.value.type, "") == "NestedExpressionGroup" ? [1] : []
         content {
           conjunction = "OR"
         }
       }
 
-      # NestedExpressionGroup entries (AND conjunction inside)
+      # Nested AND criteria inside the OR group from YAML nested expressions
       dynamic "criteria" {
         for_each = try(criteria.value.type, "") == "NestedExpressionGroup" ? criteria.value.exprs : []
         content {
@@ -58,7 +50,7 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # Single NestedExpression
+      # Single NestedExpression with AND inside
       dynamic "condition" {
         for_each = try(criteria.value.resource_type, "") == "NestedExpression"
           ? [for sub in criteria.value.expressions : sub if try(sub.resource_type, "") == "Condition"]
@@ -71,7 +63,7 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # Single Condition (flat tag)
+      # Flat single Condition
       dynamic "condition" {
         for_each = try(criteria.value.resource_type, "") == "Condition" ? [criteria.value] : []
         content {
@@ -82,7 +74,7 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # IPAddressExpression
+      # IP Address Expression
       dynamic "ipaddress_expression" {
         for_each = try(criteria.value.resource_type, "") == "IPAddressExpression" ? [criteria.value] : []
         content {
@@ -90,7 +82,7 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # PathExpression (Segments)
+      # Path Expression for segments
       dynamic "path_expression" {
         for_each = try(criteria.value.resource_type, "") == "PathExpression" ? [criteria.value] : []
         content {
