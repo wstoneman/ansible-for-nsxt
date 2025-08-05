@@ -1,54 +1,64 @@
-variable "sec_groups" {
-  description = "List of security groups"
-  type        = any
+terraform {
+  required_providers {
+    nsxt = {
+      source  = "vmware/nsxt"
+      version = ">=3.2.0"
+    }
+    local = {
+      source = "hashicorp/local"
+    }
+  }
+  required_version = ">= 0.12"
+}
+
+# Read YAML file
+data "local_file" "secgroups_yaml" {
+  filename = "${path.module}/input_test_file.yaml"
 }
 
 locals {
-  sec_groups = var.sec_groups["sec_groups"]
+  sec_groups_data = yamldecode(data.local_file.secgroups_yaml.content)["sec_groups"]
 }
 
-# Loop over Security Groups
-resource "nsxt_policy_group" "this" {
-  for_each    = { for sg in local.sec_groups : sg["id"] => sg }
-
+resource "nsxt_policy_group" "sec_group" {
+  for_each = { for sg in local.sec_groups_data : sg.display_name => sg }
   display_name = each.value.display_name
 
-  dynamic "criteria" {
-    for_each = [for expr in each.value.expression : expr if expr["resource_type"] == "NestedExpression" || expr["resource_type"] == "PathExpression" || expr["resource_type"] == "IPAddressExpression"]
-
+  # Build the expression block based on the type
+  dynamic "expression" {
+    for_each = each.value.expression
     content {
-      # Handle NestedExpression; flatten if multiple & ensure OR between
-      dynamic "condition" {
-        for_each = expr["resource_type"] == "NestedExpression" ? expr["expressions"] : []
+      resource_type = expression.value["resource_type"]
+
+      # NestedExpression special logic for OR conjunction between multiple expressions
+      # Assumes you want a group of NestedExpressions joined by OR at the top level
+      # Additional logic needed for deeper/other conjunctions
+      dynamic "expressions" {
+        for_each = contains(keys(expression.value), "expressions") ? [for exp in lookup(expression.value, "expressions", []) : exp] : []
         content {
-          # Match Key, Operator, Value as per NSX-T API (adjust as per your need)
-          key           = condition.value["key"]
-          operator      = condition.value["operator"]
-          value         = condition.value["value"]
-          member_type   = condition.value["member_type"]
-          resource_type = condition.value["resource_type"]
+          key           = expressions.value["key"]
+          member_type   = expressions.value["member_type"]
+          operator      = expressions.value["operator"]
+          resource_type = expressions.value["resource_type"]
+          value         = expressions.value["value"]
         }
       }
 
-      # Handle PathExpression
-      dynamic "path_expression" {
-        for_each = expr["resource_type"] == "PathExpression" ? expr["paths"] : []
+      # For PathExpression
+      dynamic "paths" {
+        for_each = contains(keys(expression.value), "paths") ? expression.value["paths"] : []
         content {
-          path = path_expression.value
+          path = paths.value
         }
       }
 
-      # Handle IPAddressExpression
-      dynamic "ip_expression" {
-        for_each = expr["resource_type"] == "IPAddressExpression" ? expr["ip_addresses"] : []
+      # For IPAddressExpression
+      dynamic "ip_addresses" {
+        for_each = contains(keys(expression.value), "ip_addresses") ? expression.value["ip_addresses"] : []
         content {
-          ip_addresses = [ip_expression.value]
+          ip_address = ip_addresses.value
         }
       }
     }
   }
-
-  # Explicitly handle the OR conjunction for multiple NestedExpressions per your requirements.
-  # NSX-T Policy API does not have an explicit "OR" field, but if multiple criteria are present,
-  # they're evaluated as an OR.
 }
