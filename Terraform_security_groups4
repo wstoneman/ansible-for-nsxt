@@ -3,42 +3,27 @@ locals {
 }
 
 resource "nsxt_policy_group" "group" {
-  for_each     = { for sg in local.sec_groups : sg.display_name => sg }
+  for_each     = {for sg in local.sec_groups : sg.display_name => sg}
   display_name = each.value.display_name
   description  = try(each.value.id, null)
   domain       = "default"
 
   dynamic "criteria" {
-    for_each = flatten([
-      for expr in each.value.expression : [
-        expr.resource_type == "NestedExpression" ? expr : null,
-        expr.resource_type == "Condition" ? expr : null,
-        expr.resource_type == "IPAddressExpression" ? expr : null,
-        expr.resource_type == "PathExpression" ? expr : null,
-      ]
-    ])
-
-    # Filter out nulls because flatten creates a list with nulls too
-    for_each = [for c in criteria.value != null ? [criteria.value] : []][0]
+    # Flatten and filter non-null expressions by type
+    for_each = [
+      for expr in each.value.expression : expr
+      if contains(
+        ["NestedExpression", "Condition", "IPAddressExpression", "PathExpression"],
+        try(expr.resource_type, "")
+      )
+    ]
 
     content {
       dynamic "condition" {
-        for_each = (
-          criteria.value.resource_type == "NestedExpression" && criteria.value.expressions != null
-        ) ? [
-          for cond in criteria.value.expressions : cond if cond.resource_type == "Condition"
-        ] : []
+        for_each = criteria.value.resource_type == "NestedExpression" ? [
+          for c in criteria.value.expressions : c if c.resource_type == "Condition"
+        ] : criteria.value.resource_type == "Condition" ? [criteria.value] : []
 
-        content {
-          key         = condition.value.key
-          member_type = condition.value.member_type
-          operator    = condition.value.operator
-          value       = condition.value.value
-        }
-      }
-
-      dynamic "condition" {
-        for_each = criteria.value.resource_type == "Condition" ? [criteria.value] : []
         content {
           key         = condition.value.key
           member_type = condition.value.member_type
@@ -50,14 +35,14 @@ resource "nsxt_policy_group" "group" {
       dynamic "ipaddress_expression" {
         for_each = criteria.value.resource_type == "IPAddressExpression" ? [criteria.value] : []
         content {
-          ip_addresses = criteria.value.ip_addresses
+          ip_addresses = ipaddress_expression.value.ip_addresses
         }
       }
 
       dynamic "path_expression" {
         for_each = criteria.value.resource_type == "PathExpression" ? [criteria.value] : []
         content {
-          member_paths = criteria.value.paths
+          member_paths = path_expression.value.paths
         }
       }
     }
