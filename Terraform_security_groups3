@@ -3,7 +3,8 @@ locals {
 }
 
 resource "nsxt_policy_group" "group" {
-  for_each     = { for sg in local.sec_groups : sg.display_name => sg }
+  for_each = { for sg in local.sec_groups : sg.display_name => sg }
+
   display_name = each.value.display_name
   description  = try(each.value.id, null)
   domain       = "default"
@@ -19,21 +20,22 @@ resource "nsxt_policy_group" "group" {
           try(expr.conjunction_operator, "")
       ], "OR")
     )
-      ? [{
-          type = "NestedExpressionGroup"
-          exprs = [for expr in each.value.expression : expr if try(expr.resource_type, "") == "NestedExpression"]
-        }]
-      : [for expr in each.value.expression : expr]
+    ? [{
+        type  = "NestedExpressionGroup"
+        exprs = [for expr in each.value.expression : expr if try(expr.resource_type, "") == "NestedExpression"]
+      }]
+    : [for expr in each.value.expression : expr]
+
     content {
-      # Conditionally add conjunction block only for NestedExpressionGroup
-      dynamic "conjunction" {
+      # Emit conjunction block only if the type indicates NestedExpressionGroup (needs 'OR')
+      dynamic "conjunction_block" {
         for_each = try(criteria.value.type, "") == "NestedExpressionGroup" ? [1] : []
         content {
           conjunction = "OR"
         }
       }
 
-      # Nested AND criteria inside the OR group from YAML nested expressions
+      # Nested criteria blocks (AND)
       dynamic "criteria" {
         for_each = try(criteria.value.type, "") == "NestedExpressionGroup" ? criteria.value.exprs : []
         content {
@@ -50,7 +52,7 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # Single NestedExpression with AND inside
+      # Single NestedExpression (AND)
       dynamic "condition" {
         for_each = try(criteria.value.resource_type, "") == "NestedExpression"
           ? [for sub in criteria.value.expressions : sub if try(sub.resource_type, "") == "Condition"]
@@ -63,7 +65,7 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # Flat single Condition
+      # Single flat Condition
       dynamic "condition" {
         for_each = try(criteria.value.resource_type, "") == "Condition" ? [criteria.value] : []
         content {
@@ -74,7 +76,7 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # IP Address Expression
+      # IPAddressExpression
       dynamic "ipaddress_expression" {
         for_each = try(criteria.value.resource_type, "") == "IPAddressExpression" ? [criteria.value] : []
         content {
@@ -82,7 +84,7 @@ resource "nsxt_policy_group" "group" {
         }
       }
 
-      # Path Expression for segments
+      # PathExpression for segments
       dynamic "path_expression" {
         for_each = try(criteria.value.resource_type, "") == "PathExpression" ? [criteria.value] : []
         content {
