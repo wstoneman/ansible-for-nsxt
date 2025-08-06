@@ -8,11 +8,9 @@ resource "nsxt_policy_context_profile" "from_yaml" {
   display_name = each.value.display_name
 
   dynamic "domain_name" {
-    for_each = [for attr in each.value.attributes : attr if attr.key == "DOMAIN_NAME"]
+    for_each = [for attr in each.value.attributes : attr if attr.key == "DOMAIN_NAME" && length(attr.value) > 0]
     content {
-      value = attr.value.value
+      value = domain_name.value.value  # <----- value.value avoids nesting
     }
   }
-
-  # Add similar blocks for app_id, url_category if you have those attributes.
 }
