@@ -8,62 +8,51 @@ terraform {
 }
 
 provider "nsxt" {
-  # Configure your NSX-T manager address, credentials, and other settings
-  host                   = var.nsxt_host
-  username               = var.nsxt_username
-  password               = var.nsxt_password
-  allow_unverified_ssl   = true
+  # Update these with your credentials/environment
+  host                 = var.nsxt_host
+  username             = var.nsxt_username
+  password             = var.nsxt_password
+  allow_unverified_ssl = true
 }
 
-# Read YAML file as a local_file data source
-data "local_file" "firewall_policies" {
+data "local_file" "dfw_policies" {
   filename = "${path.module}/fw_policies_variables.yml"
 }
 
 locals {
-  firewall_yaml = yamldecode(data.local_file.firewall_policies.content)
+  firewall_yaml = yamldecode(data.local_file.dfw_policies.content)
 }
 
-# Iterate over policies
-resource "nsxt_policy_gateway_policy" "this" {
-  for_each = { for policy in local.firewall_yaml["Firewall"] : policy["id"] => policy }
-
-  display_name   = each.value["display_name"]
-  category       = (try(each.value["category"], null))
-  description    = (try(each.value["description"], null))
-  sequence_number = (try(each.value["sequence_number"], null))
-  scope          = flatten([for s in each.value["scope"] : s])
+resource "nsxt_policy_security_policy" "dfw_policy" {
+  for_each        = { for section in local.firewall_yaml["Firewall"] : section["id"] => section }
+  display_name    = each.value.display_name
+  description     = try(each.value.description, null)
+  category        = try(each.value.category, "Application")
+  sequence_number = try(each.value.sequence_number, null)
+  scope           = try(flatten([for s in each.value.scope : s]), null)
 }
 
-# Iterate over rules in each policy
-resource "nsxt_policy_gateway_rule" "this" {
-  for_each = {
-    for p in local.firewall_yaml["Firewall"] :
-      p["id"] => {
-        policy_name  = p["id"]
-        rules        = p["rules"]
+resource "nsxt_policy_security_policy_rule" "dfw_rule" {
+  for_each = merge([
+    for section in local.firewall_yaml["Firewall"] : {
+      for rule in section.rules :
+      "${section["id"]}.${rule["id"]}" => {
+        section_id   = section["id"]
+        rule_data    = rule
       }
-  }
-
-  dynamic "rule" {
-    for_each = each.value.rules
-    content {
-      display_name        = rule.value["display_name"]
-      description         = (try(rule.value["description"], null))
-      sequence_number     = (try(rule.value["sequence_number"], null))
-      source_groups       = flatten([for s in rule.value["source_groups"] : s])
-      destination_groups  = flatten([for s in rule.value["destination_groups"] : s])
-      services            = flatten([for s in try(rule.value["services"], []) : s])
-      action              = rule.value["action"]
-      scope               = flatten([for s in try(rule.value["scope"], []) : s])
-      logged              = rule.value["logged"]
-      disabled            = rule.value["disabled"] == "True" ? true : false
-
-      # Optional profiles
-      profiles            = try(flatten([for s in rule.value["profiles"] : s]), null)
     }
-  }
+  ]...)
 
-  # Attach to policy
-  gateway_policy_id = nsxt_policy_gateway_policy.this[each.key].id
+  display_name      = each.value.rule_data.display_name
+  description       = try(each.value.rule_data.description, null)
+  sequence_number   = try(each.value.rule_data.sequence_number, null)
+  source_groups     = flatten([for s in try(each.value.rule_data.source_groups, []) : s])
+  destination_groups= flatten([for d in try(each.value.rule_data.destination_groups, []) : d])
+  services          = flatten([for svc in try(each.value.rule_data.services, []) : svc])
+  action            = each.value.rule_data.action
+  scope             = try(flatten([for s in try(each.value.rule_data.scope, []) : s]), null)
+  logged            = try(each.value.rule_data.logged, false)
+  disabled          = try(lower(each.value.rule_data.disabled) == "true", false)
+  profiles          = try(flatten([for p in try(each.value.rule_data.profiles, []) : p]), null)
+  policy_id         = nsxt_policy_security_policy.dfw_policy[each.value.section_id].id
 }
