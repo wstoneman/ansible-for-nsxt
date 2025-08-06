@@ -1,30 +1,18 @@
-provider "nsxt" {
-  host                 = var.nsxt_host
-  username             = var.nsxt_user
-  password             = var.nsxt_pass
-  allow_unverified_ssl = true
-}
-
 locals {
   profiles = yamldecode(file("${path.module}/context_profiles.yaml")).Context_Profile
 }
 
 resource "nsxt_policy_context_profile" "from_yaml" {
-  for_each = {
-    for profile in local.profiles : profile.id => profile
-  }
+  for_each = { for profile in local.profiles : profile.id => profile }
 
   display_name = each.value.display_name
-  description  = lookup(each.value, "description", each.value.display_name)
 
-  dynamic "attribute" {
-    for_each = each.value.attributes
+  dynamic "domain_name" {
+    for_each = [for attr in each.value.attributes : attr if attr.key == "DOMAIN_NAME"]
     content {
-      context_profile_attribute {
-        attribute_type = attribute.value.key
-        sub_type       = attribute.value.datatype
-        value          = join(",", attribute.value.value)
-      }
+      value = attr.value.value
     }
   }
+
+  # Add similar blocks for app_id, url_category if you have those attributes.
 }
