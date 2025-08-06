@@ -1,44 +1,10 @@
-terraform {
-  required_providers {
-    nsxt = {
-      source  = "vmware/nsxt"
-      version = ">=3.5.0"
-    }
-  }
-}
-
-provider "nsxt" {
-  # Update these with your credentials/environment
-  host                 = var.nsxt_host
-  username             = var.nsxt_username
-  password             = var.nsxt_password
-  allow_unverified_ssl = true
-}
-
-data "local_file" "dfw_policies" {
-  filename = "${path.module}/fw_policies_variables.yml"
-}
-
-locals {
-  firewall_yaml = yamldecode(data.local_file.dfw_policies.content)
-}
-
-resource "nsxt_policy_security_policy" "dfw_policy" {
-  for_each        = { for section in local.firewall_yaml["Firewall"] : section["id"] => section }
-  display_name    = each.value.display_name
-  description     = try(each.value.description, null)
-  category        = try(each.value.category, "Application")
-  sequence_number = try(each.value.sequence_number, null)
-  scope           = try(flatten([for s in each.value.scope : s]), null)
-}
-
 resource "nsxt_policy_security_policy_rule" "dfw_rule" {
   for_each = merge([
     for section in local.firewall_yaml["Firewall"] : {
       for rule in section.rules :
       "${section["id"]}.${rule["id"]}" => {
-        section_id   = section["id"]
-        rule_data    = rule
+        section_id = section["id"]
+        rule_data  = rule
       }
     }
   ]...)
@@ -46,13 +12,23 @@ resource "nsxt_policy_security_policy_rule" "dfw_rule" {
   display_name      = each.value.rule_data.display_name
   description       = try(each.value.rule_data.description, null)
   sequence_number   = try(each.value.rule_data.sequence_number, null)
-  source_groups     = flatten([for s in try(each.value.rule_data.source_groups, []) : s])
-  destination_groups= flatten([for d in try(each.value.rule_data.destination_groups, []) : d])
-  services          = flatten([for svc in try(each.value.rule_data.services, []) : svc])
-  action            = each.value.rule_data.action
-  scope             = try(flatten([for s in try(each.value.rule_data.scope, []) : s]), null)
-  logged            = try(each.value.rule_data.logged, false)
-  disabled          = try(lower(each.value.rule_data.disabled) == "true", false)
-  profiles          = try(flatten([for p in try(each.value.rule_data.profiles, []) : p]), null)
-  policy_id         = nsxt_policy_security_policy.dfw_policy[each.value.section_id].id
+
+  source_groups = contains(try(each.value.rule_data.source_groups, []), "ANY") ? null
+                 : try(flatten([for g in each.value.rule_data.source_groups : g]), null)
+
+  destination_groups = contains(try(each.value.rule_data.destination_groups, []), "ANY") ? null
+                       : try(flatten([for g in each.value.rule_data.destination_groups : g]), null)
+
+  services = contains(try(each.value.rule_data.services, []), "ANY") ? null
+             : try(flatten([for s in each.value.rule_data.services : s]), null)
+
+  scope = contains(try(each.value.rule_data.scope, []), "ANY") ? null
+          : try(flatten([for s in each.value.rule_data.scope : s]), null)
+
+  action     = each.value.rule_data.action
+  logged     = try(each.value.rule_data.logged, false)
+  disabled   = try(lower(each.value.rule_data.disabled) == "true", false)
+  profiles   = try(flatten([for p in try(each.value.rule_data.profiles, []) : p]), null)
+
+  policy_id  = nsxt_policy_security_policy.dfw_policy[each.value.section_id].id
 }
