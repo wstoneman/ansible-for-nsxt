@@ -1,73 +1,68 @@
-# Example main.tf
-
 provider "nsxt" {
-  # configure your nsxt manager info here
+  # Configure your NSX-T environment
+  username               = var.nsxt_username
+  password               = var.nsxt_password
+  host                   = var.nsxt_host
+  allow_unverified_ssl   = true
 }
 
 locals {
-  # You must convert your YAML to JSON before using this. Replace with path to your converted JSON file.
-  sec_groups = jsondecode(file("${path.module}/input_test_file.json"))
+  # Load preprocessed input from the Python script
+  sec_groups = jsondecode(file("${path.module}/parsed_secgroups.json"))
 }
 
-# Loop through each security group in the list
-resource "nsxt_policy_group" "groups" {
-  for_each    = { for sg in local.sec_groups["sec_groups"] : sg["id"] => sg }
+resource "nsxt_policy_group" "secgroup" {
+  for_each     = local.sec_groups
   display_name = each.value.display_name
 
   dynamic "criteria" {
-    for_each = [
-      for expr in each.value.expression :
-        expr if expr["resource_type"] == "PathExpression"
-    ]
+    for_each = each.value.criteria
     content {
-      # Segment-based grouping
-      path_expression {
-        paths = criteria.value["paths"]
-      }
-    }
-  }
+      conjunction_operator = criteria.value.conjunction_operator
 
-  dynamic "criteria" {
-    for_each = [
-      for expr in each.value.expression :
-        expr if expr["resource_type"] == "IPAddressExpression"
-    ]
-    content {
-      # IP address-based grouping
-      ip_addresses = criteria.value["ip_addresses"]
-    }
-  }
-
-  dynamic "criteria" {
-    for_each = [
-      for expr in each.value.expression :
-        expr if expr["resource_type"] == "NestedExpression"
-    ]
-    content {
-      # Nested expressions (supporting OR between them)
-      dynamic "condition" {
-        for_each = [
-          for cond in criteria.value["expressions"] :
-            cond if cond["resource_type"] == "Condition"
-        ]
+      dynamic "expression" {
+        for_each = criteria.value.expressions
         content {
-          key            = condition.value["key"]
-          operator       = condition.value["operator"]
-          member_type    = condition.value["member_type"]
-          value          = condition.value["value"]
+          dynamic "nested_expression" {
+            for_each = expression.value.resource_type == "NestedExpression" ? [expression.value] : []
+            content {
+              dynamic "expression" {
+                for_each = nested_expression.value.expressions
+                content {
+                  key         = expression.value.key
+                  operator    = expression.value.operator
+                  member_type = expression.value.member_type
+                  value       = expression.value.value
+                }
+              }
+            }
+          }
+
+          dynamic "path_expression" {
+            for_each = expression.value.resource_type == "PathExpression" ? [expression.value] : []
+            content {
+              paths = path_expression.value.paths
+            }
+          }
+
+          dynamic "ip_address_expression" {
+            for_each = expression.value.resource_type == "IPAddressExpression" ? [expression.value] : []
+            content {
+              ip_addresses = ip_address_expression.value.ip_addresses
+            }
+          }
+
+          dynamic "condition" {
+            for_each = expression.value.resource_type == "Condition" ? [expression.value] : []
+            content {
+              key         = condition.value.key
+              operator    = condition.value.operator
+              member_type = condition.value.member_type
+              value       = condition.value.value
+            }
+          }
         }
       }
-      # The default conjunction_operator between expression elements is AND
-      # To allow OR at top-level between multiple NestedExpressions you can use group_by
-      # Terraform's structure doesn't directly allow for OR between group elements, so you may need to make use of nsxt_policy_conjunction_operator, or document that OR is at the top level
     }
   }
-
-  # If there are multiple top-level NestedExpression entries => OR between them
-  # Documented: NSX-T interprets multiple criteria at the top as OR
 }
-
-# NOTE: You may need to further refine this for complex condition combinations—Terraform NSX provider supports various criteria. For expressions beyond supported cases, you may need to generate HCL for each unique pattern, or pre-process into HCL.
-
-# For advanced grouping logic (explicit ConjunctionOperator at top-level) 
-# you may need templatefile() for YAML→HCL translation outside Terraform
