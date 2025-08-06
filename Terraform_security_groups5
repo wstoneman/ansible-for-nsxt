@@ -1,66 +1,61 @@
-provider "nsxt" {
-  # Configure your NSX-T environment
-  username               = var.nsxt_username
-  password               = var.nsxt_password
-  host                   = var.nsxt_host
-  allow_unverified_ssl   = true
-}
-
 locals {
-  # Load preprocessed input from the Python script
-  sec_groups = jsondecode(file("${path.module}/parsed_secgroups.json"))
+  input_yaml = yamldecode(file(var.input_yaml_file))
+
+  group_map = {
+    for group in local.input_yaml.sec_groups :
+    group.display_name => group
+  }
+
+  # Helper function: wrap expressions if > 1
+  group_expressions = {
+    for group_name, group in local.group_map :
+    group_name => (
+      length(group.expression) > 1 ?
+        [
+          {
+            resource_type        = "NestedExpression"
+            expressions          = concat(
+              flatten([group.expression]),
+              [
+                {
+                  resource_type        = "ConjunctionOperator"
+                  conjunction_operator = "OR"
+                }
+              ]
+            )
+          }
+        ] :
+        group.expression
+    )
+  }
 }
 
-resource "nsxt_policy_group" "secgroup" {
-  for_each     = local.sec_groups
+resource "nsxt_policy_group" "sec_groups" {
+  for_each     = local.group_map
   display_name = each.value.display_name
+  domain       = "default"
 
-  dynamic "criteria" {
-    for_each = each.value.criteria
+  dynamic "expression" {
+    for_each = local.group_expressions[each.key]
     content {
-      conjunction_operator = criteria.value.conjunction_operator
+      resource_type = expression.value.resource_type
 
-      dynamic "expression" {
-        for_each = criteria.value.expressions
+      # For PathExpression
+      paths = contains(keys(expression.value), "paths") ? expression.value.paths : null
+
+      # For IPAddressExpression
+      ip_addresses = contains(keys(expression.value), "ip_addresses") ? expression.value.ip_addresses : null
+
+      # For NestedExpression
+      dynamic "expressions" {
+        for_each = contains(keys(expression.value), "expressions") ? expression.value.expressions : []
         content {
-          dynamic "nested_expression" {
-            for_each = expression.value.resource_type == "NestedExpression" ? [expression.value] : []
-            content {
-              dynamic "expression" {
-                for_each = nested_expression.value.expressions
-                content {
-                  key         = expression.value.key
-                  operator    = expression.value.operator
-                  member_type = expression.value.member_type
-                  value       = expression.value.value
-                }
-              }
-            }
-          }
-
-          dynamic "path_expression" {
-            for_each = expression.value.resource_type == "PathExpression" ? [expression.value] : []
-            content {
-              paths = path_expression.value.paths
-            }
-          }
-
-          dynamic "ip_address_expression" {
-            for_each = expression.value.resource_type == "IPAddressExpression" ? [expression.value] : []
-            content {
-              ip_addresses = ip_address_expression.value.ip_addresses
-            }
-          }
-
-          dynamic "condition" {
-            for_each = expression.value.resource_type == "Condition" ? [expression.value] : []
-            content {
-              key         = condition.value.key
-              operator    = condition.value.operator
-              member_type = condition.value.member_type
-              value       = condition.value.value
-            }
-          }
+          key               = lookup(expressions.value, "key", null)
+          member_type       = lookup(expressions.value, "member_type", null)
+          operator          = lookup(expressions.value, "operator", null)
+          value             = lookup(expressions.value, "value", null)
+          resource_type     = lookup(expressions.value, "resource_type", null)
+          conjunction_operator = lookup(expressions.value, "conjunction_operator", null)
         }
       }
     }
