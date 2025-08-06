@@ -1,16 +1,15 @@
-locals {
-  profiles = yamldecode(file("${path.module}/context_profiles.yaml")).Context_Profile
-}
-
 resource "nsxt_policy_context_profile" "from_yaml" {
   for_each = { for profile in local.profiles : profile.id => profile }
 
   display_name = each.value.display_name
 
   dynamic "domain_name" {
-    for_each = [for attr in each.value.attributes : attr if attr.key == "DOMAIN_NAME" && length(attr.value) > 0]
+    for_each = [
+      for attr in each.value.attributes : attr
+      if attr.key == "DOMAIN_NAME"
+    ]
     content {
-      value = domain_name.value.value  # <----- value.value avoids nesting
+      value = attr.value  # NOT attr.value.value and NOT [attr.value]
     }
   }
 }
