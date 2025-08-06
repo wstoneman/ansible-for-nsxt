@@ -1,0 +1,69 @@
+terraform {
+  required_providers {
+    nsxt = {
+      source  = "vmware/nsxt"
+      version = ">=3.5.0"
+    }
+  }
+}
+
+provider "nsxt" {
+  # Configure your NSX-T manager address, credentials, and other settings
+  host                   = var.nsxt_host
+  username               = var.nsxt_username
+  password               = var.nsxt_password
+  allow_unverified_ssl   = true
+}
+
+# Read YAML file as a local_file data source
+data "local_file" "firewall_policies" {
+  filename = "${path.module}/fw_policies_variables.yml"
+}
+
+locals {
+  firewall_yaml = yamldecode(data.local_file.firewall_policies.content)
+}
+
+# Iterate over policies
+resource "nsxt_policy_gateway_policy" "this" {
+  for_each = { for policy in local.firewall_yaml["Firewall"] : policy["id"] => policy }
+
+  display_name   = each.value["display_name"]
+  category       = (try(each.value["category"], null))
+  description    = (try(each.value["description"], null))
+  sequence_number = (try(each.value["sequence_number"], null))
+  scope          = flatten([for s in each.value["scope"] : s])
+}
+
+# Iterate over rules in each policy
+resource "nsxt_policy_gateway_rule" "this" {
+  for_each = {
+    for p in local.firewall_yaml["Firewall"] :
+      p["id"] => {
+        policy_name  = p["id"]
+        rules        = p["rules"]
+      }
+  }
+
+  dynamic "rule" {
+    for_each = each.value.rules
+    content {
+      display_name        = rule.value["display_name"]
+      description         = (try(rule.value["description"], null))
+      sequence_number     = (try(rule.value["sequence_number"], null))
+      source_groups       = flatten([for s in rule.value["source_groups"] : s])
+      destination_groups  = flatten([for s in rule.value["destination_groups"] : s])
+      services            = flatten([for s in try(rule.value["services"], []) : s])
+      action              = rule.value["action"]
+      scope               = flatten([for s in try(rule.value["scope"], []) : s])
+      logged              = rule.value["logged"]
+      disabled            = rule.value["disabled"] == "True" ? true : false
+
+      # Optional profiles
+      profiles            = try(flatten([for s in rule.value["profiles"] : s]), null)
+    }
+  }
+
+  # Attach to policy
+  gateway_policy_id = nsxt_policy_gateway_policy.this[each.key].id
+}
