@@ -1,0 +1,148 @@
+- hosts: localhost
+  connection: local
+  collections:
+    - vmware.alb
+  vars_files:
+    - creds.yml  # Contains avi_credentials
+
+  vars:
+    avi_pool_name: my-pool
+    new_member_ip: 10.10.10.10
+
+  tasks:
+
+    - name: "Get current pool details using avi_api_session"
+      avi_api_session:
+        avi_credentials: "{{ avi_credentials }}"
+        path: "pool"
+        params:
+          name: "{{ avi_pool_name }}"
+        method: get
+      register: pool_query
+      failed_when: pool_query.status_code not in [200, 404]
+
+    - name: "Fail if pool does not exist"
+      fail:
+        msg: "Pool '{{ avi_pool_name }}' does not exist."
+      when: pool_query.obj.count == 0
+
+    - name: "Extract existing servers"
+      set_fact:
+        current_servers: "{{ pool_query.obj.results[0].servers | default([]) }}"
+
+    - name: "Check if member already exists"
+      set_fact:
+        member_exists: "{{ current_servers | selectattr('ip.addr', 'equalto', new_member_ip) | list | length > 0 }}"
+
+    - name: "Add member to pool if not present"
+      avi_pool:
+        avi_credentials: "{{ avi_credentials }}"
+        name: "{{ avi_pool_name }}"
+        avi_api_update_method: patch
+        avi_api_patch_op: add
+        servers:
+          - ip:
+              addr: "{{ new_member_ip }}"
+              type: 'V4'
+      when:
+        - not member_exists
+
+
+
+===================
+
+- name: "Check if member already exists"
+  set_fact:
+    member_exists: "{{ current_servers | selectattr('ip.addr', 'equalto', new_member_ip) | list | length > 0 }}"
+
+- name: "Output if member already exists"
+  debug:
+    msg: >-
+      The member {{ new_member_ip }} is already in pool '{{ avi_pool_name }}'.
+  when: member_exists
+
+- name: "Output if member does not exist"
+  debug:
+    msg: >-
+      The member {{ new_member_ip }} is NOT in pool '{{ avi_pool_name }}'. Proceeding to add.
+  when: not member_exists
+
+- name: "Add member to pool if not present"
+  avi_pool:
+    avi_credentials: "{{ avi_credentials }}"
+    name: "{{ avi_pool_name }}"
+    avi_api_update_method: patch
+    avi_api_patch_op: add
+    servers:
+      - ip:
+          addr: "{{ new_member_ip }}"
+          type: 'V4'
+  when: not member_exists
+
+
+=================
+
+- hosts: localhost
+  connection: local
+  collections:
+    - vmware.alb
+  vars_files:
+    - creds.yml  # Contains avi_credentials
+
+  vars:
+    avi_vsvc_name: my-virtualservice
+    new_service_port: 8080
+    new_service_proto: TCP
+
+  tasks:
+
+    - name: "Get current Virtual Service details using avi_api_session"
+      avi_api_session:
+        avi_credentials: "{{ avi_credentials }}"
+        path: "virtualservice"
+        params:
+          name: "{{ avi_vsvc_name }}"
+        method: get
+      register: vsvc_query
+      failed_when: vsvc_query.status_code not in [200, 404]
+
+    - name: "Fail if Virtual Service does not exist"
+      fail:
+        msg: "Virtual Service '{{ avi_vsvc_name }}' does not exist."
+      when: vsvc_query.obj.count == 0
+
+    - name: "Extract existing services"
+      set_fact:
+        current_services: "{{ vsvc_query.obj.results[0].services | default([]) }}"
+
+    - name: "Check if service already exists"
+      set_fact:
+        service_exists: >-
+          {{ current_services | selectattr('port', 'equalto', new_service_port)
+                             | selectattr('enable_ssl', 'equalto', false)
+                             | list | length > 0 }}
+
+    - name: "Output if service already exists"
+      debug:
+        msg: >-
+          The service port {{ new_service_port }}/{{ new_service_proto }} is already in virtual service '{{ avi_vsvc_name }}'.
+      when: service_exists
+
+    - name: "Output if service does not exist"
+      debug:
+        msg: >-
+          The service port {{ new_service_port }}/{{ new_service_proto }} is NOT in virtual service '{{ avi_vsvc_name }}'. Proceeding to add.
+      when: not service_exists
+
+    - name: "Add service port to Virtual Service if not present"
+      avi_virtualservice:
+        avi_credentials: "{{ avi_credentials }}"
+        name: "{{ avi_vsvc_name }}"
+        avi_api_update_method: patch
+        avi_api_patch_op: add
+        services:
+          - port: "{{ new_service_port }}"
+            enable_ssl: false
+            # add protocol field if needed, e.g. 'type': '{{ new_service_proto }}'
+      when: not service_exists
+
