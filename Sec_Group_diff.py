@@ -24,13 +24,18 @@ def get_sec_groups():
 
         for group in data.get('results', []):
             membership_criteria = group.get("expression", [])
+            ip_addresses = []
+            for expr in membership_criteria:
+                if expr.get("resource_type") == "IPAddressExpression":
+                    ips = expr.get("ip_addresses", [])
+                    ip_addresses.extend(ips)
             for expr in membership_criteria:
                 if expr.get("resource_type") == "IPAddressExpression":
                     ipset_dyn_groups.append({
                         "id": group["id"],
                         "display_name": group.get("display_name"),
                         "description": group.get("description"),
-                        "expression": membership_criteria,
+                        "expression": ip_addresses
                     })
                     break
 
