@@ -78,3 +78,88 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+-----------
+
+import requests
+import json
+import os
+
+NSX_MANAGER = "https://<NSX_MANAGER>"
+USERNAME = "<USERNAME>"
+PASSWORD = "<PASSWORD>"
+SEC_GROUPS_FILE = "nsxt_ipset_dyn_groups.json"
+UPDATES_FILE = "nsxt_ipset_dyn_group_updates.json"
+VERIFY_SSL = False  # Set to True if using valid SSL cert
+
+def get_sec_groups():
+    url = f"{NSX_MANAGER}/policy/api/v1/infra/domains/default/groups"
+    session = requests.Session()
+    session.auth = (USERNAME, PASSWORD)
+    session.verify = VERIFY_SSL
+    params = {"page_size": 1000}
+    ipset_dyn_groups = []
+
+    while True:
+        response = session.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+
+        for group in data.get('results', []):
+            membership_criteria = group.get("expression", [])
+            ip_addresses = []
+            for expr in membership_criteria:
+                if expr.get("resource_type") == "IPAddressExpression":
+                    ips = expr.get("ip_addresses", [])
+                    ip_addresses.extend(ips)
+            if ip_addresses:
+                ipset_dyn_groups.append({
+                    "id": group["id"],
+                    "display_name": group.get("display_name"),
+                    "description": group.get("description"),
+                    "ip_addresses": ip_addresses,
+                    "_create_time": group.get("_create_time"),
+                })
+
+        cursor = data.get("cursor")
+        if cursor:
+            params = {"cursor": cursor, "page_size": 1000}
+        else:
+            break
+
+    return ipset_dyn_groups
+
+def save_json(data, filename):
+    with open(filename, "w") as f:
+        json.dump(data, f, indent=2)
+
+def load_json(filename):
+    if os.path.exists(filename):
+        with open(filename, "r") as f:
+            return json.load(f)
+    return []
+
+def main():
+    print("Collecting NSX-T IP set dynamic groups...")
+    current_groups = get_sec_groups()
+
+    if not os.path.exists(SEC_GROUPS_FILE):
+        print("First run - creating groups JSON.")
+        save_json(current_groups, SEC_GROUPS_FILE)
+    else:
+        print("Found existing JSON, comparing with current state...")
+        prev_groups = load_json(SEC_GROUPS_FILE)
+        prev_ids = {g["id"] for g in prev_groups}
+        new_groups = [g for g in current_groups if g["id"] not in prev_ids]
+        if new_groups:
+            print(f"Found {len(new_groups)} new groups. Writing updates JSON.")
+            save_json(new_groups, UPDATES_FILE)
+            save_json(current_groups, SEC_GROUPS_FILE)
+        else:
+            print("No new groups detected.")
+
+if __name__ == "__main__":
+    main()
+
