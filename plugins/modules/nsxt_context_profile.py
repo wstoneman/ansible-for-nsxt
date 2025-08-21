@@ -52,10 +52,6 @@ options:
         description: 'Description of the resource'
         required: false
         type: str
-    tags:
-        description: 'Opaque identifier meaningful to the API user'
-        required: false
-        type: list
     state:
         choices:
             - present
@@ -68,7 +64,7 @@ options:
 '''
 
 EXAMPLES = '''
-- name: Create a new Security Service
+- name: Create a new Context Profile
   nsxt_security_services:
     hostname: "10.192.167.137"
     username: "admin"
@@ -177,9 +173,6 @@ def main():
     display_name = module.params['display_name']
     manager_url = 'https://{}/policy/api/v1'.format(mgr_hostname)
 
-    # err_msg = 'NSX v9.0.0 and above do not support MP resources in nsxt_ip_blocks.py. Please use nsxt_policy_ip_block.py module.'
-    # validate_nsx_mp_support(module, manager_url, mgr_username, mgr_password, validate_certs, err_msg)
-
     context_dict = get_context_from_display_name(module, manager_url, mgr_username, mgr_password, validate_certs,
                                                 display_name)
 
@@ -198,11 +191,7 @@ def main():
             if module.check_mode:
                 module.exit_json(changed=True, debug_out=str(json.dumps(context_params)), id='12345')
 
-            #print("?????????????????????????")
-            #print(context_params)
             for attribute in context_params['attributes']:
-                #print("!!!!!!!!!!!!!!!!!!!!")
-                #print(attribute)
                 for attr_value in attribute['value']:
                     attribute_dict = get_custom_attributes_from_display_name(module, manager_url, mgr_username, mgr_password,
                                                                  validate_certs,
